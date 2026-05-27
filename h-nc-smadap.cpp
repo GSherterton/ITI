@@ -4,42 +4,43 @@
 #include <vector>
 #include <list>
 #include <queue>
+#include <map>
+#include <stack>
 #include "Node.h"
 
 using namespace std;
 
 // Variáveis globais
 vector<char> alfabeto = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
-string mensagem = "102450010211000703060090002450233004050060078600007688000785";
+string mensagem_original = "102450010211000703060090002450233004050060078600007688000785";
 vector<int> cont(alfabeto.size(), 0); // contador para cada símbolo do alfabeto
-list<pair<char, int>> nos_candidatos; // nós para poder formar uma junção
 
-priority_queue<Node> pq; // considerando que eu tenho uma fila de prioridade, depois organizo melhor isso
+priority_queue<Node*, vector<Node*>, NodeComparator> pq; // fila de prioridade para gerar a árvore de Huffman
+Node* root; // raiz da árvore de Huffman
+map<char, string> tabela_de_codigos;
+
+string mensagem_codificada;
+string mensagem_decodificada;
 
 void count(){
-  for(int i = 0; i < mensagem.size(); i++){
-    cont[(mensagem[i] - '0')]++;
+  for(int i = 0; i < mensagem_original.size(); i++){
+    cont[(mensagem_original[i] - '0')]++;
   }
 }
 
 void init_nos(){
-  for(int i = cont.size()-1; i >= 0; i--){
+  for(int i = 0; i < cont.size(); i++){
     if(cont[i] == 0){ // se aquele símbolo não aparece naquela mensagem não precisa colocá-lo na árvore
       continue;
     }
 
-    auto it = nos_candidatos.begin(); // inicializa fora do loop para poder utilizar depois
-    for(; it != nos_candidatos.end(); it++){ // itera procurando a posição de inserção daquele símbolo
-      if(cont[i] >= it->second){
-        break;
-      }
-    }
+    Node* aux_node = new Node(cont[i], alfabeto[i]); // cria um nó considerando a contagem e o símbolo
 
-    nos_candidatos.insert(it, make_pair(alfabeto[i], cont[i])); // adiciona o símbolo na lista
+    pq.push(aux_node); // adiciona o nó na fila de prioridade, considerando a contagem e o símbolo
   }
 }
 
-void build_huffman_tree(){
+Node* build_huffman_tree(){
   // usar fila de prioridade na qual eu tenha acesso aos menores elementos
   // a lógica vai ser,
   // enquanto eu tiver dois nos candidatos
@@ -49,13 +50,85 @@ void build_huffman_tree(){
   // fazendo as devidas ligações
 
   while(pq.size() >= 2){ // enquanto haver elementos para juntar
-    // resgato os menorres elementos e os tiro da fila de prioridade
-    auto aux2 = pq.top(); pq.pop();
-    auto aux1 = pq.top(); pq.pop(); // aux1 >= aux2
+    // resgato os menores elementos e os tiro da fila de prioridade
+    Node* aux2 = pq.top(); pq.pop();
+    Node* aux1 = pq.top(); pq.pop(); // aux1 >= aux2
 
-    // Node node(cont, aux1, aux2); // cria o nó fazendo as devidas ligações
+    Node* node = new Node(aux1->cont+aux2->cont, aux1, aux2); // cria o nó fazendo as devidas ligações
 
-    // pq.push(node); // adiciona um novo nó
+    // cout << "Novo nó: (Contador = " << node.cont << ")\n"; // debug
+
+    pq.push(node); // adiciona um novo nó
+  }
+
+  // cout << "pq.size() = " << pq.size() << endl; // debug
+
+  Node* root = pq.top(); pq.pop();
+
+  return root;
+}
+
+void generate_codes(){
+  string code = ""; // código de Huffman para cada símbolo
+  stack<Node*> s;
+
+  s.push(root); // começo o dfs pela raiz
+  Node* aux_node;
+
+  // a lógica vai ser,
+  // desço para um nó, e verifico se é folha, se for já coloca o código
+  // se não for desço para o filho esquerdo
+
+  while(!s.empty()){
+    aux_node = s.top();
+
+    if((s.top()->left == nullptr) && (s.top()->right == nullptr)){ // se for um nó folha
+      tabela_de_codigos[s.top()->simbolo] = code; // salva o código de Huffman para aquele símbolo
+      cout << "Símbolo: '" << s.top()->simbolo << "', Código de Huffman: " << code << endl;
+
+      s.top()->visited = 2; // marco que já visitei aquele nó folha, para não visitá-lo mais tarde
+    }
+
+    if(aux_node->visited == 0){
+      s.push(aux_node->left);
+      code += "0";
+    } else if(aux_node->visited == 1){
+      s.push(aux_node->right);
+      code += "1";
+    } else {
+      s.pop();
+      code.pop_back(); // tiro o último bit do código
+      continue; // volto para o próximo elemento da pilha
+    }
+
+    aux_node->visited++; // marco que já visitei aquele nó
+  }
+}
+
+void codificate_message(){
+  mensagem_codificada = ""; // reseta a mensagem codificada
+
+  for(int i = 0; i < mensagem_original.size(); i++){
+    mensagem_codificada += tabela_de_codigos[mensagem_original[i]];
+  }
+}
+
+void decodificate_message(){
+  mensagem_decodificada = ""; // mensagem decodificada
+  
+  Node* aux_node = root; // começo o processo de decodificação pela raiz
+
+  for(int i = 0; i < mensagem_codificada.size(); i++){
+    if(mensagem_codificada[i] == '0'){
+      aux_node = aux_node->left;
+    }else{
+      aux_node = aux_node->right;
+    }
+
+    if((aux_node->left == nullptr) && (aux_node->right == nullptr)){ // chegou em uma folha
+      mensagem_decodificada += aux_node->simbolo;
+      aux_node = root; // volta para a raiz
+    }
   }
 }
 
@@ -64,22 +137,35 @@ int main(){
   // fill_pq(); // preenche a fila de prioridade
   
   // verifica se a contagem está certa
-  // cout << "Quantidade total de símbolos: " << mensagem.size() << endl;
+  // cout << "Quantidade total de símbolos: " << mensagem_original.size() << endl;
   // cout << "Contagem de cada símbolo:\n";
   // for(int i = 0; i < cont.size(); i++){
   //   cout << "'" << alfabeto[i] << "': " << cont[i] << endl;
   // }
 
-
   init_nos(); // inicializa os nós inicialmente
 
   // verifica se a contagem está certa
   // cout << "Nós candidatos:\n";
-  // for(auto it = nos_candidatos.begin(); it != nos_candidatos.end(); it++){
-  //   cout << "('" << it->first << "', " << it->second << ")\n";
+  // while(pq.size() > 0){
+  //   auto node = pq.top(); pq.pop();
+  //   cout << "Símbolo: '" << node.simbolo << "', Contagem: " << node.cont << endl;
   // }
 
-  build_huffman_tree(); // constrói a árvore de Huffman
+  root = build_huffman_tree(); // constrói a árvore de Huffman
+
+  generate_codes(); // gera os códigos de Huffman para cada símbolo
+
+  // for(auto it : tabela_de_codigos){
+  //   cout << "Símbolo: '" << it.first << "', Código de Huffman: " << it.second << endl;
+  // }
+
+  codificate_message(); // codifica a mensagem original usando os códigos de Huffman gerados
+  decodificate_message(); // decodifica a mensagem codificada usando a árvore de Huffman
+
+  cout << "Mensagem original(" << mensagem_original.size() << " símbolos): " << mensagem_original << endl;
+  cout << "Mensagem codificada(" << mensagem_codificada.size() << " bits): " << mensagem_codificada << endl;
+  cout << "Mensagem decodificada(" << mensagem_decodificada.size() << " símbolos): " << mensagem_decodificada << endl;
 
   return 0;
 }
