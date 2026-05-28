@@ -13,7 +13,7 @@ using namespace std;
 // Variáveis globais
 vector<char> alfabeto = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
 string mensagem_original = "102450010211000703060090002450233004050060078600007688000785";
-vector<int> cont(alfabeto.size(), 0); // contador para cada símbolo do alfabeto
+map<char, int> cont; // contador para cada símbolo do alfabeto
 
 priority_queue<Node*, vector<Node*>, NodeComparator> pq; // fila de prioridade para gerar a árvore de Huffman
 Node* root; // raiz da árvore de Huffman
@@ -24,17 +24,17 @@ string mensagem_decodificada;
 
 void count(){
   for(int i = 0; i < mensagem_original.size(); i++){
-    cont[(mensagem_original[i] - '0')]++;
+    cont[mensagem_original[i]]++;
   }
 }
 
 void init_nos(){
-  for(int i = 0; i < cont.size(); i++){
-    if(cont[i] == 0){ // se aquele símbolo não aparece naquela mensagem não precisa colocá-lo na árvore
+  for(auto it : cont){
+    if(it.second == 0){ // se aquele símbolo não aparece naquela mensagem não precisa colocá-lo na árvore
       continue;
     }
 
-    Node* aux_node = new Node(cont[i], alfabeto[i]); // cria um nó considerando a contagem e o símbolo
+    Node* aux_node = new Node(it.second, it.first); // cria um nó considerando a contagem e o símbolo
 
     pq.push(aux_node); // adiciona o nó na fila de prioridade, considerando a contagem e o símbolo
   }
@@ -134,13 +134,12 @@ void decodificate_message(){
 
 int main(){
   count(); // conta a ocorrência de cada símbolo
-  // fill_pq(); // preenche a fila de prioridade
   
   // verifica se a contagem está certa
   // cout << "Quantidade total de símbolos: " << mensagem_original.size() << endl;
   // cout << "Contagem de cada símbolo:\n";
-  // for(int i = 0; i < cont.size(); i++){
-  //   cout << "'" << alfabeto[i] << "': " << cont[i] << endl;
+  // for(auto it : cont){
+  //   cout << "'" << it.first << "': " << it.second << endl;
   // }
 
   init_nos(); // inicializa os nós inicialmente
